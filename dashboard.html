@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amazon Products Dashboard</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    .tab-btn { transition: all 0.2s; }
+    .tab-btn.active { border-bottom: 3px solid var(--primary); color: var(--primary); font-weight: 600; }
+    .tab-btn:hover { background: var(--accent); }
+    .bar { transition: width 0.6s ease, height 0.6s ease; }
+    .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+    .checkbox-cat { accent-color: var(--primary); width: 18px; height: 18px; cursor: pointer; }
+    select, input[type=range] { accent-color: var(--primary); }
+    .legend-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .fade-in { animation: fadeIn 0.4s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .compare-card { border-left: 4px solid; }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-0 m-0" style="min-height:100vh;">
+
+  <!-- Header -->
+  <div class="sticky top-0 z-50 bg-[var(--background)] border-b border-[var(--border)] px-6 py-4">
+    <div class="flex items-center justify-between max-w-[1400px] mx-auto">
+      <div>
+        <h1 class="text-2xl font-bold flex items-center gap-2">
+          <span>📊</span> Amazon Products Dashboard
+        </h1>
+        <p class="text-[var(--muted-foreground)] text-sm mt-1">เปรียบเทียบ Category &amp; Discount Percentage Analysis</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="productCount" class="text-sm bg-[var(--accent)] px-3 py-1 rounded-full font-medium"></span>
+        <span id="categoryCount" class="text-sm bg-[var(--accent)] px-3 py-1 rounded-full font-medium"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="border-b border-[var(--border)] bg-[var(--card)] px-6">
+    <div class="max-w-[1400px] mx-auto flex gap-0">
+      <button class="tab-btn active px-5 py-3 text-sm" data-tab="overview" onclick="switchTab('overview')">📈 Overview</button>
+      <button class="tab-btn px-5 py-3 text-sm" data-tab="compare" onclick="switchTab('compare')">⚖️ Category Comparison</button>
+      <button class="tab-btn px-5 py-3 text-sm" data-tab="discount" onclick="switchTab('discount')">🏷️ Discount Analysis</button>
+      <button class="tab-btn px-5 py-3 text-sm" data-tab="products" onclick="switchTab('products')">📦 Products Explorer</button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="max-w-[1400px] mx-auto p-6">
+
+    <!-- TAB: Overview -->
+    <div id="tab-overview" class="tab-content fade-in">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 card-hover">
+          <p class="text-[var(--muted-foreground)] text-xs uppercase tracking-wide">Total Products</p>
+          <p id="kpi-total" class="text-3xl font-bold mt-1">—</p>
+        </div>
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 card-hover">
+          <p class="text-[var(--muted-foreground)] text-xs uppercase tracking-wide">Avg Discount</p>
+          <p id="kpi-avgdisc" class="text-3xl font-bold mt-1">—</p>
+        </div>
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 card-hover">
+          <p class="text-[var(--muted-foreground)] text-xs uppercase tracking-wide">Avg Rating</p>
+          <p id="kpi-avgrating" class="text-3xl font-bold mt-1">—</p>
+        </div>
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 card-hover">
+          <p class="text-[var(--muted-foreground)] text-xs uppercase tracking-wide">Categories</p>
+          <p id="kpi-cats" class="text-3xl font-bold mt-1">—</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5">
+          <h3 class="font-semibold text-base mb-4">📊 Product Count by Category</h3>
+          <div id="cat-bars" class="space-y-3"></div>
+        </div>
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5">
+          <h3 class="font-semibold text-base mb-4">🏷️ Discount Distribution (All Products)</h3>
+          <div id="disc-bars" class="space-y-2"></div>
+        </div>
+      </div>
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 mt-6">
+        <h3 class="font-semibold text-base mb-4">📉 Average Discount % by Category</h3>
+        <div id="avg-disc-chart" class="space-y-3"></div>
+      </div>
+    </div>
+
+    <!-- TAB: Category Comparison -->
+    <div id="tab-compare" class="tab-content hidden fade-in">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 mb-6">
+        <h3 class="font-semibold text-base mb-3">⚖️ เลือก Categories เพื่อเปรียบเทียบ</h3>
+        <p class="text-[var(--muted-foreground)] text-sm mb-4">เลือกอย่างน้อย 2 หมวดหมู่เพื่อเปรียบเทียบ Discount, Rating, และจำนวนสินค้า</p>
+        <div id="compare-checkboxes" class="flex flex-wrap gap-3"></div>
+        <button onclick="runComparison()" class="mt-4 px-5 py-2 rounded-lg text-sm font-medium" style="background:var(--primary);color:var(--primary-foreground);">เปรียบเทียบ Compare</button>
+      </div>
+      <div id="compare-results" class="space-y-6"></div>
+    </div>
+
+    <!-- TAB: Discount Analysis -->
+    <div id="tab-discount" class="tab-content hidden fade-in">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 mb-6">
+        <h3 class="font-semibold text-base mb-3">🎯 Discount Range Filter</h3>
+        <div class="flex flex-wrap items-center gap-4">
+          <div class="flex items-center gap-2">
+            <label class="text-sm text-[var(--muted-foreground)]">Min:</label>
+            <input type="range" id="disc-min" min="0" max="100" value="0" oninput="updateDiscFilter()" class="w-32">
+            <span id="disc-min-val" class="text-sm font-mono w-10">0%</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-sm text-[var(--muted-foreground)]">Max:</label>
+            <input type="range" id="disc-max" min="0" max="100" value="100" oninput="updateDiscFilter()" class="w-32">
+            <span id="disc-max-val" class="text-sm font-mono w-10">100%</span>
+          </div>
+          <select id="disc-cat-filter" onchange="updateDiscFilter()" class="bg-[var(--background)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm">
+            <option value="all">All Categories</option>
+          </select>
+          <span id="disc-filter-count" class="text-sm text-[var(--muted-foreground)]"></span>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5">
+          <h3 class="font-semibold text-base mb-4">📊 Filtered Discount Distribution</h3>
+          <div id="filtered-disc-bars" class="space-y-2"></div>
+        </div>
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5">
+          <h3 class="font-semibold text-base mb-4">🔝 Top Discounted Products</h3>
+          <div id="top-discounted" class="space-y-2 max-h-[500px] overflow-y-auto pr-2"></div>
+        </div>
+      </div>
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 mt-6">
+        <h3 class="font-semibold text-base mb-4">📈 Discount vs Rating by Category</h3>
+        <div id="disc-vs-rating" class="space-y-4"></div>
+      </div>
+    </div>
+
+    <!-- TAB: Products Explorer -->
+    <div id="tab-products" class="tab-content hidden fade-in">
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 mb-6">
+        <div class="flex flex-wrap gap-4 items-center">
+          <input type="text" id="search-input" placeholder="🔍 Search products..." oninput="filterProducts()"
+            class="bg-[var(--background)] border border-[var(--border)] rounded-lg px-4 py-2 text-sm flex-1 min-w-[200px]">
+          <select id="prod-cat-filter" onchange="filterProducts()" class="bg-[var(--background)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm">
+            <option value="all">All Categories</option>
+          </select>
+          <select id="prod-sort" onchange="filterProducts()" class="bg-[var(--background)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm">
+            <option value="disc-desc">Discount ↓</option>
+            <option value="disc-asc">Discount ↑</option>
+            <option value="rating-desc">Rating ↓</option>
+            <option value="rating-asc">Rating ↑</option>
+            <option value="name-asc">Name A-Z</option>
+          </select>
+          <span id="prod-count" class="text-sm text-[var(--muted-foreground)]"></span>
+        </div>
+      </div>
+      <div id="products-list" class="space-y-2"></div>
+      <div class="text-center mt-4">
+        <button id="load-more-btn" onclick="loadMoreProducts()" class="px-5 py-2 rounded-lg text-sm border border-[var(--border)] hover:bg-[var(--accent)]" style="display:none;">Load More</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const COLORS = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316'];
+
+function parseCSVLine(line) {
+  const parts = [];
+  let inQuote = false, field = '';
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') inQuote = !inQuote;
+    else if (c === ',' && !inQuote) { parts.push(field); field = ''; }
+    else if (c !== '\r') field += c;
+  }
+  parts.push(field);
+  return parts;
+}
+
+function parsePrice(s) {
+  if (!s) return 0;
+  return parseFloat(s.replace(/[^0-9.]/g, '')) || 0;
+}
+
+let allProducts = [], categories = {}, catColors = {}, filteredProducts = [], productPage = 0;
+const PAGE_SIZE = 50;
+
+async function init() {
+  try {
+    const resp = await fetch('amazon.csv');
+    if (!resp.ok) throw new Error('Network response was not ok');
+    const csv = await resp.text();
+    processCSV(csv);
+  } catch(e) {
+    // If it fails (e.g., opened via file:// protocol), show a file picker OVERLAY
+    const overlay = document.createElement('div');
+    overlay.id = 'file-upload-overlay';
+    overlay.innerHTML = `
+      <div class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[var(--background)] p-6">
+        <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-8 max-w-md text-center shadow-lg">
+          <div class="text-4xl mb-4">📁</div>
+          <h2 class="text-xl font-bold mb-2">Load Dashboard Data</h2>
+          <p class="text-[var(--muted-foreground)] text-sm mb-6">
+            คุณกำลังเปิดไฟล์นี้โดยตรง (ไม่ได้ผ่าน Local Server) <br>
+            กรุณากดปุ่มด้านล่างเพื่อเลือกไฟล์ <b>amazon.csv</b> เพื่อดู Dashboard
+          </p>
+          <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+          <label for="csvFileInput" class="cursor-pointer inline-block bg-[var(--primary)] text-[var(--primary-foreground)] px-6 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity">
+            เลือกไฟล์ amazon.csv
+          </label>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    document.getElementById('csvFileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('file-upload-overlay').remove();
+        processCSV(e.target.result);
+      };
+      reader.readAsText(file);
+    });
+  }
+}
+
+function processCSV(csv) {
+  const lines = csv.split('\n');
+  allProducts = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    try {
+      const p = parseCSVLine(lines[i]);
+      if (p.length >= 7) {
+        allProducts.push({
+          id: p[0], name: p[1],
+          category: p[2] || 'Unknown',
+          topCategory: (p[2] || 'Unknown').split('|')[0],
+          subCategory: (p[2] || 'Unknown').split('|').slice(1).join(' > '),
+          discountedPrice: parsePrice(p[3]),
+          actualPrice: parsePrice(p[4]),
+          discountPct: parseInt((p[5] || '0').replace('%', '')) || 0,
+          rating: parseFloat(p[6]) || 0,
+          ratingCount: parseInt((p[7] || '0').replace(/,/g, '')) || 0,
+        });
+      }
+    } catch(e) {}
+  }
+  categories = {};
+  allProducts.forEach(p => { if (!categories[p.topCategory]) categories[p.topCategory] = []; categories[p.topCategory].push(p); });
+  const sortedCats = Object.keys(categories).sort((a, b) => categories[b].length - categories[a].length);
+  sortedCats.forEach((c, i) => catColors[c] = COLORS[i % COLORS.length]);
+
+  document.getElementById('productCount').textContent = allProducts.length + ' Products';
+  document.getElementById('categoryCount').textContent = sortedCats.length + ' Categories';
+
+  // Populate dropdowns
+  ['disc-cat-filter', 'prod-cat-filter'].forEach(id => {
+    sortedCats.forEach(c => {
+      document.getElementById(id).innerHTML += '<option value="' + c + '">' + c + ' (' + categories[c].length + ')</option>';
+    });
+  });
+
+  renderOverview(sortedCats);
+  renderCompareCheckboxes(sortedCats);
+  updateDiscFilter();
+  filterProducts();
+}
+
+function renderOverview(sortedCats) {
+  const total = allProducts.length;
+  const avgDisc = (allProducts.reduce((s, p) => s + p.discountPct, 0) / total).toFixed(1);
+  const avgRat = (allProducts.reduce((s, p) => s + p.rating, 0) / total).toFixed(1);
+  document.getElementById('kpi-total').textContent = total.toLocaleString();
+  document.getElementById('kpi-avgdisc').textContent = avgDisc + '%';
+  document.getElementById('kpi-avgrating').textContent = '⭐ ' + avgRat;
+  document.getElementById('kpi-cats').textContent = sortedCats.length;
+
+  // Category bars
+  const maxCount = Math.max(...sortedCats.map(c => categories[c].length));
+  document.getElementById('cat-bars').innerHTML = sortedCats.map(c => {
+    const cnt = categories[c].length;
+    const pct = (cnt / maxCount * 100).toFixed(0);
+    return '<div class="flex items-center gap-3"><div class="w-44 text-sm truncate text-right" title="' + c + '">' + c + '</div><div class="flex-1 bg-[var(--background)] rounded-full h-7 overflow-hidden"><div class="bar h-full rounded-full flex items-center px-3" style="width:' + pct + '%;background:' + catColors[c] + '"><span class="text-xs font-bold text-white drop-shadow">' + cnt + '</span></div></div><div class="w-12 text-xs text-[var(--muted-foreground)] text-right">' + (cnt / total * 100).toFixed(1) + '%</div></div>';
+  }).join('');
+
+  // Discount distribution
+  const buckets = {'0-10':0,'11-20':0,'21-30':0,'31-40':0,'41-50':0,'51-60':0,'61-70':0,'71-80':0,'81-90':0,'91-100':0};
+  allProducts.forEach(p => { const d = p.discountPct; buckets[d <= 10 ? '0-10' : d <= 20 ? '11-20' : d <= 30 ? '21-30' : d <= 40 ? '31-40' : d <= 50 ? '41-50' : d <= 60 ? '51-60' : d <= 70 ? '61-70' : d <= 80 ? '71-80' : d <= 90 ? '81-90' : '91-100']++; });
+  const maxB = Math.max(...Object.values(buckets));
+  const bColors = ['#6366f1','#818cf8','#a78bfa','#c084fc','#e879f9','#f472b6','#fb7185','#f87171','#ef4444','#dc2626'];
+  document.getElementById('disc-bars').innerHTML = Object.entries(buckets).map(([k, v], i) =>
+    '<div class="flex items-center gap-3"><div class="w-16 text-sm text-right font-mono">' + k + '%</div><div class="flex-1 bg-[var(--background)] rounded-full h-6 overflow-hidden"><div class="bar h-full rounded-full flex items-center px-2" style="width:' + (v / maxB * 100).toFixed(0) + '%;background:' + bColors[i] + '"><span class="text-xs font-bold text-white drop-shadow">' + v + '</span></div></div></div>'
+  ).join('');
+
+  // Avg discount by category
+  document.getElementById('avg-disc-chart').innerHTML = sortedCats.map(c => {
+    const prods = categories[c];
+    const avg = prods.reduce((s, p) => s + p.discountPct, 0) / prods.length;
+    const mn = Math.min(...prods.map(p => p.discountPct));
+    const mx = Math.max(...prods.map(p => p.discountPct));
+    const ar = (prods.reduce((s, p) => s + p.rating, 0) / prods.length).toFixed(1);
+    return '<div class="flex items-center gap-3"><div class="w-44 text-sm truncate text-right" title="' + c + '">' + c + '</div><div class="flex-1 bg-[var(--background)] rounded-full h-8 relative overflow-hidden"><div class="absolute h-full rounded-full opacity-25" style="left:' + mn + '%;width:' + (mx - mn) + '%;background:' + catColors[c] + '"></div><div class="bar h-full rounded-full flex items-center justify-center px-3" style="width:' + avg.toFixed(0) + '%;background:' + catColors[c] + '"><span class="text-xs font-bold text-white drop-shadow">' + avg.toFixed(1) + '%</span></div></div><div class="w-36 text-xs text-[var(--muted-foreground)]"><span>↓' + mn + '%</span> · <span>↑' + mx + '%</span> · ⭐' + ar + '</div></div>';
+  }).join('');
+}
+
+function renderCompareCheckboxes(cats) {
+  document.getElementById('compare-checkboxes').innerHTML = cats.map((c, i) =>
+    '<label class="flex items-center gap-2 bg-[var(--background)] border border-[var(--border)] rounded-lg px-3 py-2 cursor-pointer hover:bg-[var(--accent)]"><input type="checkbox" class="checkbox-cat" value="' + c + '"' + (i < 3 ? ' checked' : '') + '><span class="legend-dot" style="background:' + catColors[c] + '"></span><span class="text-sm">' + c + '</span><span class="text-xs text-[var(--muted-foreground)]">(' + categories[c].length + ')</span></label>'
+  ).join('');
+}
+
+function median(arr) {
+  const s = [...arr].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
+}
+
+function getDiscBuckets(discs) {
+  const b = {'0-10':0,'11-20':0,'21-30':0,'31-40':0,'41-50':0,'51-60':0,'61-70':0,'71-80':0,'81-90':0,'91-100':0};
+  discs.forEach(d => { b[d <= 10 ? '0-10' : d <= 20 ? '11-20' : d <= 30 ? '21-30' : d <= 40 ? '31-40' : d <= 50 ? '41-50' : d <= 60 ? '51-60' : d <= 70 ? '61-70' : d <= 80 ? '71-80' : d <= 90 ? '81-90' : '91-100']++; });
+  return b;
+}
+
+function runComparison() {
+  const selected = [...document.querySelectorAll('.checkbox-cat:checked')].map(cb => cb.value);
+  if (selected.length < 2) { alert('กรุณาเลือกอย่างน้อย 2 Categories'); return; }
+  const container = document.getElementById('compare-results');
+  container.innerHTML = '';
+
+  const compData = selected.map(c => {
+    const prods = categories[c];
+    const discs = prods.map(p => p.discountPct);
+    const rats = prods.map(p => p.rating);
+    return { cat: c, count: prods.length, avgDisc: discs.reduce((a, b) => a + b, 0) / discs.length, medianDisc: median(discs), minDisc: Math.min(...discs), maxDisc: Math.max(...discs), avgRating: rats.reduce((a, b) => a + b, 0) / rats.length, discBuckets: getDiscBuckets(discs), color: catColors[c] };
+  });
+
+  // Cards
+  const gridCols = Math.min(selected.length, 4);
+  container.innerHTML += '<div class="grid grid-cols-1 md:grid-cols-' + gridCols + ' gap-4">' +
+    compData.map(d => '<div class="compare-card bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 card-hover" style="border-left-color:' + d.color + '"><h4 class="font-bold text-base mb-3 flex items-center gap-2"><span class="legend-dot" style="background:' + d.color + '"></span>' + d.cat + '</h4><div class="space-y-3">' +
+      [['Products', d.count], ['Avg Discount', d.avgDisc.toFixed(1) + '%'], ['Median Discount', d.medianDisc + '%'], ['Discount Range', d.minDisc + '% - ' + d.maxDisc + '%'], ['Avg Rating', '⭐ ' + d.avgRating.toFixed(2)]].map(([l, v]) =>
+        '<div class="flex justify-between"><span class="text-sm text-[var(--muted-foreground)]">' + l + '</span><span class="font-bold">' + v + '</span></div>'
+      ).join('') + '</div></div>'
+    ).join('') + '</div>';
+
+  // Distribution comparison
+  const bucketLabels = ['0-10','11-20','21-30','31-40','41-50','51-60','61-70','71-80','81-90','91-100'];
+  const maxBV = Math.max(...compData.flatMap(d => Object.values(d.discBuckets)));
+  container.innerHTML += '<div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5"><h3 class="font-semibold text-base mb-2">📊 Discount Distribution Comparison</h3><div class="flex flex-wrap gap-4 mb-4">' +
+    compData.map(d => '<span class="flex items-center gap-1 text-sm"><span class="legend-dot" style="background:' + d.color + '"></span>' + d.cat + '</span>').join('') +
+    '</div><div class="space-y-3">' +
+    bucketLabels.map(label => '<div><div class="text-xs font-mono text-[var(--muted-foreground)] mb-1">' + label + '%</div>' +
+      compData.map(d => {
+        const val = d.discBuckets[label] || 0;
+        const pctCat = (val / d.count * 100).toFixed(1);
+        const barW = maxBV > 0 ? (val / maxBV * 100).toFixed(0) : 0;
+        return '<div class="flex items-center gap-2 mb-1"><div class="w-4"><span class="legend-dot" style="background:' + d.color + ';width:8px;height:8px"></span></div><div class="flex-1 bg-[var(--background)] rounded-full h-5 overflow-hidden"><div class="bar h-full rounded-full flex items-center px-2" style="width:' + barW + '%;background:' + d.color + '"><span class="text-xs font-bold text-white drop-shadow">' + (val > 0 ? val : '') + '</span></div></div><span class="text-xs text-[var(--muted-foreground)] w-12 text-right">' + pctCat + '%</span></div>';
+      }).join('') + '</div>'
+    ).join('') + '</div></div>';
+
+  // Comparison table
+  const metrics = [
+    { label: 'Avg Discount %', key: 'avgDisc', fmt: v => v.toFixed(1) + '%', higher: true },
+    { label: 'Median Discount %', key: 'medianDisc', fmt: v => v + '%', higher: true },
+    { label: 'Max Discount %', key: 'maxDisc', fmt: v => v + '%', higher: true },
+    { label: 'Avg Rating ⭐', key: 'avgRating', fmt: v => v.toFixed(2), higher: true },
+    { label: 'Product Count', key: 'count', fmt: v => v.toLocaleString(), higher: true },
+  ];
+  container.innerHTML += '<div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 overflow-x-auto"><h3 class="font-semibold text-base mb-4">📋 Comparison Table</h3><table class="w-full text-sm"><thead><tr class="border-b border-[var(--border)]"><th class="text-left py-2 px-3 text-[var(--muted-foreground)]">Metric</th>' +
+    compData.map(d => '<th class="text-center py-2 px-3" style="color:' + d.color + '">' + d.cat + '</th>').join('') +
+    '<th class="text-center py-2 px-3 text-[var(--muted-foreground)]">Winner</th></tr></thead><tbody>' +
+    metrics.map(m => {
+      const vals = compData.map(d => d[m.key]);
+      const bestIdx = vals.indexOf(Math.max(...vals));
+      return '<tr class="border-b border-[var(--border)] hover:bg-[var(--accent)]"><td class="py-2 px-3 font-medium">' + m.label + '</td>' +
+        compData.map((d, i) => '<td class="text-center py-2 px-3' + (i === bestIdx ? ' font-bold' : '') + '"' + (i === bestIdx ? ' style="color:' + d.color + '"' : '') + '>' + m.fmt(d[m.key]) + (i === bestIdx ? ' 🏆' : '') + '</td>').join('') +
+        '<td class="text-center py-2 px-3"><span class="legend-dot" style="background:' + compData[bestIdx].color + '"></span></td></tr>';
+    }).join('') + '</tbody></table></div>';
+}
+
+function updateDiscFilter() {
+  const min = parseInt(document.getElementById('disc-min').value);
+  const max = parseInt(document.getElementById('disc-max').value);
+  const cat = document.getElementById('disc-cat-filter').value;
+  document.getElementById('disc-min-val').textContent = min + '%';
+  document.getElementById('disc-max-val').textContent = max + '%';
+
+  const filtered = allProducts.filter(p => p.discountPct >= min && p.discountPct <= max && (cat === 'all' || p.topCategory === cat));
+  document.getElementById('disc-filter-count').textContent = filtered.length + ' products found';
+
+  const buckets = {'0-10':0,'11-20':0,'21-30':0,'31-40':0,'41-50':0,'51-60':0,'61-70':0,'71-80':0,'81-90':0,'91-100':0};
+  filtered.forEach(p => { const d = p.discountPct; buckets[d <= 10 ? '0-10' : d <= 20 ? '11-20' : d <= 30 ? '21-30' : d <= 40 ? '31-40' : d <= 50 ? '41-50' : d <= 60 ? '51-60' : d <= 70 ? '61-70' : d <= 80 ? '71-80' : d <= 90 ? '81-90' : '91-100']++; });
+  const maxB = Math.max(...Object.values(buckets), 1);
+  const bColors = ['#6366f1','#818cf8','#a78bfa','#c084fc','#e879f9','#f472b6','#fb7185','#f87171','#ef4444','#dc2626'];
+  document.getElementById('filtered-disc-bars').innerHTML = Object.entries(buckets).map(([k, v], i) =>
+    '<div class="flex items-center gap-3"><div class="w-16 text-sm text-right font-mono">' + k + '%</div><div class="flex-1 bg-[var(--background)] rounded-full h-6 overflow-hidden"><div class="bar h-full rounded-full flex items-center px-2" style="width:' + (v / maxB * 100).toFixed(0) + '%;background:' + bColors[i] + '"><span class="text-xs font-bold text-white drop-shadow">' + (v > 0 ? v : '') + '</span></div></div></div>'
+  ).join('');
+
+  // Top discounted
+  const top = [...filtered].sort((a, b) => b.discountPct - a.discountPct).slice(0, 20);
+  document.getElementById('top-discounted').innerHTML = top.map((p, i) =>
+    '<div class="flex items-center gap-3 p-3 rounded-lg hover:bg-[var(--accent)] border-b border-[var(--border)]"><span class="text-lg font-bold text-[var(--muted-foreground)] w-8">#' + (i + 1) + '</span><div class="flex-1 min-w-0"><div class="text-sm font-medium truncate" title="' + p.name.replace(/"/g, '&quot;') + '">' + p.name + '</div><div class="text-xs text-[var(--muted-foreground)]">' + p.topCategory + '</div></div><div class="text-right"><div class="text-base font-bold" style="color:' + (p.discountPct >= 70 ? '#ef4444' : p.discountPct >= 50 ? '#f59e0b' : '#10b981') + '">' + p.discountPct + '%</div><div class="text-xs text-[var(--muted-foreground)]">⭐ ' + p.rating + '</div></div></div>'
+  ).join('');
+
+  // Disc vs rating
+  const catStats = {};
+  filtered.forEach(p => { if (!catStats[p.topCategory]) catStats[p.topCategory] = { discs: [], ratings: [], count: 0 }; catStats[p.topCategory].discs.push(p.discountPct); catStats[p.topCategory].ratings.push(p.rating); catStats[p.topCategory].count++; });
+  document.getElementById('disc-vs-rating').innerHTML = Object.entries(catStats).sort((a, b) => b[1].count - a[1].count).map(([cat, st]) => {
+    const avgD = (st.discs.reduce((a, b) => a + b, 0) / st.count).toFixed(1);
+    const avgR = (st.ratings.reduce((a, b) => a + b, 0) / st.count).toFixed(2);
+    const col = catColors[cat] || '#6366f1';
+    return '<div class="flex items-center gap-4 p-3 rounded-lg hover:bg-[var(--accent)]"><span class="legend-dot" style="background:' + col + '"></span><div class="w-44 text-sm font-medium truncate">' + cat + '</div><div class="flex-1 flex items-center gap-4"><div class="flex-1"><div class="text-xs text-[var(--muted-foreground)] mb-1">Avg Discount</div><div class="bg-[var(--background)] rounded-full h-5 overflow-hidden"><div class="h-full rounded-full" style="width:' + avgD + '%;background:' + col + ';opacity:0.7"></div></div><span class="text-xs font-mono">' + avgD + '%</span></div><div class="flex-1"><div class="text-xs text-[var(--muted-foreground)] mb-1">Avg Rating</div><div class="bg-[var(--background)] rounded-full h-5 overflow-hidden"><div class="h-full rounded-full" style="width:' + (avgR / 5 * 100).toFixed(0) + '%;background:' + col + '"></div></div><span class="text-xs font-mono">⭐ ' + avgR + '</span></div></div><span class="text-xs text-[var(--muted-foreground)] w-20 text-right">' + st.count + ' items</span></div>';
+  }).join('');
+}
+
+function filterProducts() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const cat = document.getElementById('prod-cat-filter').value;
+  const sort = document.getElementById('prod-sort').value;
+  filteredProducts = allProducts.filter(p => (cat === 'all' || p.topCategory === cat) && (!search || p.name.toLowerCase().includes(search)));
+  switch (sort) {
+    case 'disc-desc': filteredProducts.sort((a, b) => b.discountPct - a.discountPct); break;
+    case 'disc-asc': filteredProducts.sort((a, b) => a.discountPct - b.discountPct); break;
+    case 'rating-desc': filteredProducts.sort((a, b) => b.rating - a.rating); break;
+    case 'rating-asc': filteredProducts.sort((a, b) => a.rating - b.rating); break;
+    case 'name-asc': filteredProducts.sort((a, b) => a.name.localeCompare(b.name)); break;
+  }
+  document.getElementById('prod-count').textContent = filteredProducts.length + ' products';
+  productPage = 0;
+  renderProducts();
+}
+
+function renderProducts() {
+  const end = (productPage + 1) * PAGE_SIZE;
+  const visible = filteredProducts.slice(0, end);
+  document.getElementById('products-list').innerHTML = visible.map((p, i) => {
+    const dc = p.discountPct >= 70 ? '#ef4444' : p.discountPct >= 50 ? '#f59e0b' : p.discountPct >= 30 ? '#6366f1' : '#10b981';
+    return '<div class="flex items-center gap-4 p-3 bg-[var(--card)] border border-[var(--border)] rounded-lg hover:bg-[var(--accent)] card-hover"><span class="text-sm font-bold text-[var(--muted-foreground)] w-8 text-center">' + (i + 1) + '</span><div class="flex-1 min-w-0"><div class="text-sm font-medium truncate" title="' + p.name.replace(/"/g, '&quot;') + '">' + p.name + '</div><div class="flex gap-2 mt-1"><span class="text-xs px-2 py-0.5 rounded-full" style="background:' + catColors[p.topCategory] + '22;color:' + catColors[p.topCategory] + '">' + p.topCategory + '</span></div></div><div class="flex items-center gap-4"><div class="text-center"><div class="text-xs text-[var(--muted-foreground)]">Discount</div><div class="text-lg font-bold" style="color:' + dc + '">' + p.discountPct + '%</div></div><div class="text-center"><div class="text-xs text-[var(--muted-foreground)]">Rating</div><div class="text-sm font-medium">⭐ ' + p.rating + '</div></div><div class="text-center"><div class="text-xs text-[var(--muted-foreground)]">Price</div><div class="text-sm font-medium">₹' + p.discountedPrice.toLocaleString() + '</div></div></div></div>';
+  }).join('');
+  document.getElementById('load-more-btn').style.display = end < filteredProducts.length ? 'inline-block' : 'none';
+}
+
+function loadMoreProducts() { productPage++; renderProducts(); }
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.remove('hidden');
+  document.querySelector('[data-tab="' + tab + '"]').classList.add('active');
+  const el = document.getElementById('tab-' + tab);
+  el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in');
+}
+
+init();
+</script>
+</body>
+</html>
